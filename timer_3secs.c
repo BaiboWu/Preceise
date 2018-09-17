@@ -37,7 +37,7 @@ float sec1_ang[2][441]={0}, sec2_ang[2][441]={0}, sec3_ang[2][441]={0};
 PidTypeDef PID_Pos1, PID_Pos2, PID_Pos3;
 
 /*TIM2:ÖÐ¶ÏÈÎÎñ´¦Àíº¯Êý£¬ÖÐ¶ÏÆµÂÊ1KHz*/
-static uint16_t count=0, interval=10;
+static uint16_t count=0, interval=20;
 
 float sec_ang_targ[3][2] = {0}, sec_ang_real[3][2] = {0}, sec_ang_step[3][2] = {0};
 float sec_dst_real[3][3] = {0}, sec_delta_dst[3][3] = {0}, sec_dst_step[3][3] = {0}, sec_dst_motor[3][3] = {0};
@@ -46,12 +46,12 @@ float sec_ang0[3][2] = {0};
 float sec_delta_dst1[3][3] = {0};
 float deg_Node1_Last[6] = {0}, sec_phi[3] = {30, -90, -30};
 
-float deg_yuzhi[3][2]={0.3, 0.3, 0.3, 0.3, 0.3, 0.3},  deg_thred[2] = {0.3, 0.8};
+float deg_yuzhi[3][2]={0.1, 0.1, 0.1, 0.1, 0.1, 0.1},  deg_thred[2] = {0.1, 0.3};
 float lashen[3][3], bengjindu_adjust[3][3] = {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3}, length_yuzhi_la_adjust[2] = {0.3, 0.8};
-float P_ang=0.1, P_bjin = 0.05, P_bjin1 = 0.2;
+float P_ang=0.1, P_bjin = 0.1, P_bjin1 = 0.2;
 
 int32_t qc_actu_q[3][3] = {0};//Êµ¼Êµç»úEPOS·µ»ØÇý¶¯qcÁ¿
-float length_yuzhi_shen=3, length_yuzhi_la=6, bengjindu = 0.0, deg_kuadu=15, d_l = 24.7, bjin_yuzhi = 0.0005;
+float length_yuzhi_shen=3, length_yuzhi_la=6, bengjindu = 0.0, deg_kuadu=3, d_l = 24.7, bjin_yuzhi = 0.0005;
 
 u8 send_flag=0, print_flag=0, stable_flag[3] = {0}, stable_num[3] = {0}, run_flag[3] = {0};//´òÓ¡flag
 
@@ -105,18 +105,12 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 				}
 				
 				//Êµ¼Ê½Ç¶È¶ÔÓ¦¹ØÏµ£ºÐè¸ü¸Ä£¿£¿£¿
-				for(i = 0; i < 2; i++)
-				{
-					for(j = 0; j < 2; j++)
-					{
-						sec_ang_real[j][i] = deg_Node1[2*j+1-i];
-					}
-					sec_ang_real[2][i] = deg_Node2[1-i];
-				}
+				sec_ang_real[0][0] = deg_Node1[0];
+				sec_ang_real[0][1] = deg_Node1[1];
 				sec_ang_real[1][0] = deg_Node1[2];
 				sec_ang_real[1][1] = -deg_Node1[3];
-				sec_ang_real[2][0] = deg_Node2[1];
-				sec_ang_real[2][1] = deg_Node2[0];
+				sec_ang_real[2][0] = deg_Node2[0];
+				sec_ang_real[2][1] = deg_Node2[1];
 				
 				//ÅÜÔ²¸øÄ¿±êalpha belta
 				if(start_flag==1)
@@ -131,7 +125,7 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 							//sec_ang_targ[2][i] = sec3_ang[i][kk];
 						}
 						kk=kk+1;
-						if(kk==441) kk=0;
+						if(kk>=441) kk=0;
 					}
 					count_1+=1;
 				} 
@@ -141,12 +135,22 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					if(count_1==speed)
 					{
 						count_1=0;
-						for(i = 0; i < 2; i++)
-						{
-//							sec_ang_targ[i] = 20 * sin(kk /441.0 * 2 * PI);
-						}
+						sec_ang_targ[2][0] = 20 * sin(kk /151.0 * 2 * PI);
+						
 						kk=kk+1;
-						if(kk==441) kk=0;
+						if(kk>=151) kk=0;
+					}
+					count_1+=1;
+				}
+				if(start_flag==3)
+				{
+					if(count_1==speed)
+					{
+						count_1=0;
+						sec_ang_targ[2][1] = 20 * sin(kk /151.0 * 2 * PI);
+						
+						kk=kk+1;
+						if(kk>=151) kk=0;
 					}
 					count_1+=1;
 				}
@@ -411,7 +415,7 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 				}
 				else if(print_flag == 2)
 				{
-					VS4Channal_Send(100*sec_ang_real[2][0],100*sec_ang_real[2][1],100*sec_ang_real[1][0], 100*sec_ang_real[1][1]);
+					VS4Channal_Send(100*sec_ang_real[2][0],100*sec_ang_real[2][1],100*sec_ang_targ[2][0], 100*sec_ang_targ[2][1]);
 				}
 
 				count=0;

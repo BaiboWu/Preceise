@@ -48,7 +48,7 @@ float deg_Node1_Last[6] = {0}, sec_phi[3] = {30, -90, -30};
 
 float deg_yuzhi[3][2]={0.3, 0.3, 0.3, 0.3, 0.3, 0.3},  deg_thred[2] = {0.3, 0.8};
 float lashen[3][3], bengjindu_adjust[3][3] = {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3}, length_yuzhi_la_adjust[2] = {0.3, 0.8};
-float P_ang=0.2, P_bjin = 0.05, P_bjin1 = 0.2;
+float P_ang=0.1, P_bjin = 0.05, P_bjin1 = 0.2;
 
 int32_t qc_actu_q[3][3] = {0};//Êµ¼Êµç»úEPOS·µ»ØÇý¶¯qcÁ¿
 float length_yuzhi_shen=3, length_yuzhi_la=6, bengjindu = 0.0, deg_kuadu=15, d_l = 24.7, bjin_yuzhi = 0.0005;
@@ -126,9 +126,9 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 						count_1=0;
 						for(i = 0; i < 2; i++)
 						{
-							sec_ang_targ[0][i] = sec1_ang[i][kk];
-							sec_ang_targ[1][i] = sec2_ang[i][kk];
-							sec_ang_targ[2][i] = sec3_ang[i][kk];
+							//sec_ang_targ[0][i] = sec1_ang[i][kk];
+							//sec_ang_targ[1][i] = sec2_ang[i][kk];
+							//sec_ang_targ[2][i] = sec3_ang[i][kk];
 						}
 						kk=kk+1;
 						if(kk==441) kk=0;
@@ -361,16 +361,8 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 						//×î´óÀ­ÉìÁ¿ÏÞÖÆ
 						if(sec_delta_dst[i][j] < 0)
 						{
-							if(-lashen[i][j] > length_yuzhi_shen)
-							{
-								sec_delta_dst[i][j] = 0;
-							}
-						  
-							//ËÉ³ÚÉþ×ÓÕÅ½ôÁ¦¿ØÖÆ
-							if(i == 2)
-							{
-								sec_delta_dst[i][j] = -P_bjin1 * (lashen[i][j] - bengjindu);
-							}
+							//Control tensions for each cable
+							sec_delta_dst[i][j] = sec_delta_dst[i][j] - P_bjin * (lashen[i][j] - bengjindu);
 						}
 						else if(sec_delta_dst[i][j] > 0)
 						{
@@ -382,48 +374,20 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					}
 				}
 				
-				//µ½´ï¾«¶È·¶Î§Ê±£¬¿ªÆô±Á½ôÁ¿¿ØÖÆ
-//				for(i = 0; i < 2; i++)
-//				{
-//					if((fabs(sec_delta_dst[i][0]) < bjin_yuzhi) && (fabs(sec_delta_dst[i][1]) < bjin_yuzhi) && (fabs(sec_delta_dst[i][2]) < bjin_yuzhi) && run_flag[i] == 0)
-//					{
-//						for(j = 0; j < 3; j++)
-//						{
-//							if(fabs(lashen[i][j]-bengjindu) < bengjindu_adjust[i][j])
-//							{
-//								adjust_flag[i][j] = 1;
-//							}
-//							else
-//							{
-//								adjust_flag[i][j] = 0;
-//							}
-//							bengjindu_adjust[i][j] = length_yuzhi_la_adjust[adjust_flag[i][j]];
-//							
-//							if(fabs(lashen[i][j] - bengjindu) < bengjindu_adjust[i][j])
-//							{
-//								sec_delta_dst[i][j] = 0;
-//							}
-//							else
-//							{
-//								sec_delta_dst[i][j] = -P_bjin * (lashen[i][j] - bengjindu);
-//							}
-//						}
-//					}
-//				}
 				
-				//·¢ËÍÇý¶¯Á¿¸øµç»ú
+				//Send motor servo command
 				if(send_flag == 1)
 				{
 					for(i = 0; i < 3; i++)
 					{
 						for(j = 0; j < 3; j++)
 						{
-							//°²È«ÉèÖÃ£¬Ã¿ÖÜÆÚ²»³¬¹ý5mm
+							//The max limit for delta motion
 							if(fabs(sec_delta_dst[i][j]) > 5)
 							{
 								sec_delta_dst[i][j] = 0;
 							}
-							//·¢ËÍÃüÁî£¬ÐèÐ£¶Ô¸ü¸Ä£¿£¿£¿
+							//Send command automatic
 							Motor_StartPos(3 * i + j + 1, sec_delta_dst[i][j]);
 						}
 					}
@@ -435,7 +399,7 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					{
 						for(j = 0; j < 3; j++)
 						{
-							//·¢ËÍÃüÁî£¬ÐèÐ£¶Ô¸ü¸Ä£¿£¿£¿
+							//Send command manually
 							Motor_StartPos(3 * i + j + 1, sec_delta_dst1[i][j]);
 						}
 					}

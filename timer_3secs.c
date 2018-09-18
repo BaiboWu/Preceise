@@ -31,7 +31,7 @@ void TIM_Task_Config(void)
 	TIM_Cmd(TIMforTASK, ENABLE);
 }
 //Desired trajectory data points
-float sec1_ang[2][441]={0}, sec2_ang[2][441]={0}, sec3_ang[2][441]={0};
+float sec1_ang[2][151]={0}, sec2_ang[2][151]={0}, sec3_ang[2][151]={0};
 
 //PID structure
 PidTypeDef PID_Pos1, PID_Pos2, PID_Pos3;
@@ -48,15 +48,16 @@ float sec_delta_dst1[3][3] = {0};
 float deg_Node1_Last[8] = {0}, sec_phi[3] = {30, -90, -30};
 
 //degree threshold and lashen limits
-float deg_yuzhi[3][2]={0.1, 0.1, 0.1, 0.1, 0.1, 0.1},  deg_thred[2] = {0.1, 0.3};
-float lashen[3][3];
+float deg_yuzhi[3][2]={0.1, 0.1, 0.1, 0.1, 0.1, 0.1},  deg_thred[3] = {0.1, 0.3, 1.0};
+float lashen[3][3], bengjindu[3][3] = {0.0};
+
 //P parameters adjustment
 float P_ang=0.1, P_bjin = 0.1, P_bjin1 = 0.2;
 
 int32_t qc_actu_q[3][3] = {0};//actual encoders of motors
-float length_yuzhi_shen=3, length_yuzhi_la=8, bengjindu = 0.0, deg_kuadu=3, d_l = 24.7;
+float length_yuzhi_shen=3, length_yuzhi_la=8, deg_kuadu=3, d_l = 24.7;
 
-u8 send_flag=0, print_flag=0, stable_flag[3] = {0}, stable_num[3] = {0}, addeg_flag[3][2] = {0};
+u8 send_flag=0, print_flag=0, stable_flag[3] = {0}, stable_num[3] = {0}, run_flag[3] = {0}, addeg_flag[3][2] = {0};
 
 uint32_t kk=0;
 u8 start_flag=0, count_1=0, speed = 15;//¿ØÖÆÃ¿¼¸¸öÖÜÆÚ×ßÒ»¸öµã
@@ -111,42 +112,28 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 				sec_ang_real[2][1] = deg_Node2[1];
 				
 				//set desired trajectory
-				if(start_flag==1)
+				if(start_flag != 0)
 				{
 					if(count_1==speed)
 					{
 						count_1=0;
-						for(i = 0; i < 2; i++)
+						if(start_flag == 1)
 						{
-							sec_ang_targ[0][i] = sec1_ang[i][kk];
-							sec_ang_targ[1][i] = sec2_ang[i][kk];
-							sec_ang_targ[2][i] = sec3_ang[i][kk];
+							for(i = 0; i < 2; i++)
+							{
+								sec_ang_targ[0][i] = sec1_ang[i][kk];
+								sec_ang_targ[1][i] = sec2_ang[i][kk];
+								sec_ang_targ[2][i] = sec3_ang[i][kk];
+							}
 						}
-						kk++;
-						if(kk>=441) kk=0;
-					}
-					count_1++;
-				} 
-				
-				if(start_flag==2)
-				{
-					if(count_1==speed)
-					{
-						count_1=0;
-						sec_ang_targ[2][0] = 20 * sin(kk /151.0 * 2 * PI);
-						
-						kk++;
-						if(kk>=151) kk=0;
-					}
-					count_1++;
-				}
-				if(start_flag==3)
-				{
-					if(count_1==speed)
-					{
-						count_1=0;
-						sec_ang_targ[2][1] = 20 * sin(kk /151.0 * 2 * PI);
-						
+						if(start_flag == 2)
+						{
+							sec_ang_targ[2][0] = 20 * sin(kk /151.0 * 2 * PI);
+						}
+						if(start_flag == 3)
+						{
+							sec_ang_targ[2][1] = 20 * sin(kk /151.0 * 2 * PI);
+						}
 						kk++;
 						if(kk>=151) kk=0;
 					}
@@ -190,18 +177,42 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 				//degree limit for stability
 				for(i = 0; i < 3; i++)
 				{
-					//Vary between small and big threshold 
-					for(j = 0; j < 2; j++)
+					if(run_flag[i] == 0)
 					{
-						if(fabs(sec_ang_real[i][j]-sec_ang_targ[i][j]) < deg_yuzhi[i][j])
+						sec_ang0[i][0] = sec_ang_targ[i][0];
+						sec_ang0[i][1] = sec_ang_targ[i][1];
+						run_flag[i] == 1;
+					}
+					
+					if((fabs(sec_ang0[i][0] - sec_ang_targ[i][0])>0.01) || (fabs(sec_ang0[i][1] - sec_ang_targ[i][1])>0.01))
+					{
+						run_flag[i] = 0;
+						stable_num[i] = 0;
+					}
+					else
+					{
+						//Vary between small and big threshold 
+						for(j = 0; j < 2; j++)
 						{
-							addeg_flag[i][j] = 1;
+							if(fabs(sec_ang_real[i][j]-sec_ang_targ[i][j]) < deg_yuzhi[i][j])
+							{
+								addeg_flag[i][j] = 1;
+								if(j == 0)
+									stable_flag[i] = 1;
+							}
+							else
+							{
+								addeg_flag[i][j] = 0;
+								if((j == 0) && (stable_flag[i] == 1))
+								{
+									stable_flag[i] = 0;
+									stable_num[i]++;
+								}
+							}
+							deg_yuzhi[i][j] = deg_thred[addeg_flag[i][j]];
+							if(stable_num[i] > 5)
+								deg_yuzhi[i][1] = deg_thred[2];
 						}
-						else
-						{
-							addeg_flag[i][j] = 0;
-						}
-						deg_yuzhi[i][j] = deg_thred[addeg_flag[i][j]];
 					}
 					
 					//Check whether lies in the threshold or not
@@ -214,6 +225,11 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					}
 					else
 					{
+						for(k = i; k < 3; k++)
+						{
+							run_flag[k] = 0;
+							stable_num[k] = 0;
+						}
 						break;
 					}
 				}
@@ -229,7 +245,7 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 						if(sec_delta_dst[i][j] < 0)
 						{
 							//Control tensions for each cable
-							sec_delta_dst[i][j] = sec_delta_dst[i][j] - P_bjin * (lashen[i][j] - bengjindu);
+							sec_delta_dst[i][j] = sec_delta_dst[i][j] - P_bjin * (lashen[i][j] - bengjindu[i][j]);
 						}
 						else if(sec_delta_dst[i][j] > 0)
 						{
@@ -242,32 +258,24 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					}
 				}
 				
-				
 				//Send motor servo command
-				if(send_flag == 1)
+				for(i = 0; i < 3; i++)
 				{
-					for(i = 0; i < 3; i++)
+					for(j = 0; j < 3; j++)
 					{
-						for(j = 0; j < 3; j++)
+						//The max limit for delta motion
+						if(fabs(sec_delta_dst[i][j]) > 5)
 						{
-							//The max limit for delta motion
-							if(fabs(sec_delta_dst[i][j]) > 5)
-							{
-								sec_delta_dst[i][j] = 0;
-							}
-							//Send command automatic
+							sec_delta_dst[i][j] = 0;
+						}
+						//Send command automatic
+						if(send_flag == 1)
+						{
 							Motor_StartPos(3 * i + j + 1, sec_delta_dst[i][j]);
 						}
-					}
-				}
-				
-				if(send_flag == 2)
-				{
-					for(i = 0; i < 3; i++)
-					{
-						for(j = 0; j < 3; j++)
+						//Send command manually
+						if(send_flag == 2)
 						{
-							//Send command manually
 							Motor_StartPos(3 * i + j + 1, sec_delta_dst1[i][j]);
 						}
 					}

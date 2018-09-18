@@ -48,11 +48,11 @@ float sec_delta_dst1[3][3] = {0};
 float deg_Node1_Last[8] = {0}, sec_phi[3] = {30, -90, -30};
 
 //degree threshold and lashen limits
-float deg_yuzhi[3][2]={0.1, 0.1, 0.1, 0.1, 0.1, 0.1},  deg_thred[3] = {0.1, 0.3, 1.0};
+float deg_yuzhi[3][2]={0.1, 0.1, 0.1, 0.1, 0.1, 0.1},  deg_thred[3][3] = {0.1, 0.2, 0.2, 0.1, 0.2, 0.2, 0.1, 0.2, 0.2};
 float lashen[3][3], bengjindu[3][3] = {0.0};
 
 //P parameters adjustment
-float P_ang=0.1, P_bjin = 0.1, P_bjin1 = 0.2;
+float P_ang=0.15, P_bjin = 0.1, P_bjin1 = 0.2;
 
 int32_t qc_actu_q[3][3] = {0};//actual encoders of motors
 float length_yuzhi_shen=3, length_yuzhi_la=8, deg_kuadu=3, d_l = 24.7;
@@ -126,14 +126,13 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 								sec_ang_targ[2][i] = sec3_ang[i][kk];
 							}
 						}
-						if(start_flag == 2)
+						else if(start_flag < 8)
 						{
-							sec_ang_targ[2][0] = 20 * sin(kk /151.0 * 2 * PI);
+							i = (7 - start_flag) / 2;
+							j = (7 - start_flag) % 2;
+							sec_ang_targ[i][j] = 20 * sin(kk /151.0 * 2 * PI);
 						}
-						if(start_flag == 3)
-						{
-							sec_ang_targ[2][1] = 20 * sin(kk /151.0 * 2 * PI);
-						}
+
 						kk++;
 						if(kk>=151) kk=0;
 					}
@@ -181,13 +180,16 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					{
 						sec_ang0[i][0] = sec_ang_targ[i][0];
 						sec_ang0[i][1] = sec_ang_targ[i][1];
-						run_flag[i] == 1;
+						run_flag[i] = 1;
 					}
 					
 					if((fabs(sec_ang0[i][0] - sec_ang_targ[i][0])>0.01) || (fabs(sec_ang0[i][1] - sec_ang_targ[i][1])>0.01))
 					{
-						run_flag[i] = 0;
-						stable_num[i] = 0;
+						for(k = i; k < 3; k++)
+						{
+							run_flag[k] = 0;
+							stable_num[k] = 0;
+						}
 					}
 					else
 					{
@@ -209,9 +211,12 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 									stable_num[i]++;
 								}
 							}
-							deg_yuzhi[i][j] = deg_thred[addeg_flag[i][j]];
-							if(stable_num[i] > 5)
-								deg_yuzhi[i][1] = deg_thred[2];
+							deg_yuzhi[i][j] = deg_thred[i][addeg_flag[i][j]+j];
+							deg_thred[i][2] = deg_thred[i][1] + 0.1 * stable_num[i];
+							if(stable_num[i] > 10)
+							{
+								stable_num[i] = 10;
+							}
 						}
 					}
 					
@@ -225,11 +230,6 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					}
 					else
 					{
-						for(k = i; k < 3; k++)
-						{
-							run_flag[k] = 0;
-							stable_num[k] = 0;
-						}
 						break;
 					}
 				}
@@ -253,6 +253,11 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 							if(lashen[i][j] > length_yuzhi_la)
 							{
 								sec_delta_dst[i][j] = 0;
+							}
+							
+							if(lashen[i][j] < bengjindu[i][j])
+							{
+								sec_delta_dst[i][j] = sec_delta_dst[i][j] - P_bjin1 * (lashen[i][j] - bengjindu[i][j]);
 							}
 						}
 					}

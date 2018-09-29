@@ -342,32 +342,27 @@ PidTypeDef PID_Pos3;
 static uint16_t count=0;
 uint16_t interval=10;
 
-float q_real[3]={0.0}, delta_q[3] = {0.0}, lashenq[3] = {0.0};
+float q_real[3]={0.0}, delta_q[3] = {0.0};
 float alpha_targ=0, belta_targ=0, alpha_step = 0, belta_step=0, alpha_real = 0, belta_real=0;
 
 float deg_Node2_0_Last=0, deg_Node2_1_Last=0;
 
-u8 send_flag=0;
-float deg_yuzhi[2]={0.1, 0.1};
-float P=0.15, P_cur = 20;
-	
-u8 print_flag=0, adjust_flag[3] = {0, 0, 0}, addeg_flag[2] = {0, 0};
-
-float delta_q11=0.0, delta_q22=0.0, delta_q33=0.0;//ÊÖ¶¯µ÷½Úµç»úÓÃ
-
+u8 send_flag=0, print_flag=0;
+float delta_ang = 0.0, deg_yuzhi[2]={0.1, 0.1};
+float P=0.15, P_cur = 6000.0;
 float deg_kuadu=3, phi_n = -30, angle0_alpha = 0, angle0_belta = 0;
 
 uint32_t kk=0;
-uint16_t cur[3] = {250, 200, 200}, cur0[3] = {200, 180, 180}, cur_max[3] = {400, 400, 400}, cur_min[3] = {100, 80, 80};
-int32_t qc_actu_q[3] = {0};
+uint16_t cur[3], cur_max[3] = {320, 300, 300}, cur_min[3] = {120, 100, 100};
+
 u8 start_flag=0, count_1=0, speed = 15;//¿ØÖÆÃ¿¼¸¸öÖÜÆÚ×ßÒ»¸öµã
 u8 cur_flag[3] = {0}, pos_flag[3] = {1}, zero_flag = 0;
 
-float d_l = 24.7, bengjin_dead = 0.5, pos_actu_q[3] = {0.0};
+float d_l = 24.7;
 
 void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 {	
-	u8 i, j;
+	u8 i;
 	if(TIM_GetITStatus(TIMforTASK,TIM_IT_Update)!=RESET)
 	{
 		TIM_ClearITPendingBit(TIMforTASK,TIM_IT_Update);		
@@ -442,18 +437,20 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 				}
 				
 				//¼ÆËãÊµ¼Ê3¸ùÉþ ¿×¼ä¾àÀë
-				alpha_step = alpha_real + P * (alpha_targ - alpha_real);
-				belta_step = belta_real + P * (belta_targ - belta_real);
+				delta_ang = P * (alpha_targ - alpha_real);
+				if(fabs(delta_ang) > 1.0)
+					delta_ang = 1.0 * (delta_ang/fabs(delta_ang));
+				alpha_step = alpha_real + delta_ang;
+				
+				delta_ang = P * (belta_targ - belta_real);
+				if(fabs(delta_ang) > 1.0)
+					delta_ang = 1.0 * (delta_ang/fabs(delta_ang));
+				belta_step = belta_real + delta_ang;
 					
 				for(i = 0; i < 3; i++)
 				{
 					q_real[i] = q_calc(alpha_real,belta_real, phi_n, i);
 					delta_q[i] = q_real[i] - q_calc(alpha_step,belta_step, phi_n, i);
-					
-					//read encoders and calculate lashen value
-					qc_actu_q[i]=EPOS_SDOReadActualPos(7+i);
-					pos_actu_q[i]=(float)qc_actu_q[i]*(12.0/4/512/157.464);
-					lashenq[i] = pos_actu_q[i]-(d_l-q_real[i]);
 				}
 				
 				//½Ç¶ÈÅÐ¶Ï=0µÄãÐÖµ£¬ÔÚÎó²îãÐÖµ·¶Î§¼´²»¸øµç»úÇý¶¯Á¿
@@ -462,45 +459,14 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					for(i = 0; i < 3; i++)
 					{
 						delta_q[i] = 0;
-						cur[i] = cur0[i];
 					}
 				}
-				else
-				{
-					for(i = 0; i < 3; i++)
-					{
-						if((delta_q[i]<0) && (fabs(lashenq[i]) > bengjin_dead))
-						{
-							if(lashenq[i] > 0)
-							{
-								for(j = 0; j < 3; j++)
-								{
-									if(delta_q[j] > 0)
-										cur[j] = cur[j] - P_cur*(lashenq[i] - bengjin_dead);
-									if(cur[j] < cur_min[j])
-										cur[j] = cur_min[j];
-								}
-							}
-							else
-							{
-								for(j = 0; j < 3; j++)
-								{
-									if(delta_q[j] > 0)
-										cur[j] = cur[j] - P_cur*(lashenq[i] + bengjin_dead);
-									if(cur[j] > cur_max[j])
-										cur[j] = cur_max[j];
-								}
-							}
-						}
-					}
-				}
-				
-				
+							
 				if(send_flag == 1)
 				{
 					for(i = 0; i < 3; i++)
 					{
-						if(delta_q[i]>0)
+						if(delta_q[i] >= 0)
 						{		
 							pos_flag[i] = 0;
 							if(cur_flag[i] == 0)
@@ -509,6 +475,12 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 								cur_flag[i] = 1;
 							}
 							
+							cur[i] = cur_min[i] + P_cur * delta_q[i];
+							if(cur[i] > cur_max[i])
+							{
+								cur[i] = cur_max[i];
+							}
+					
 							EPOS_SDOSetTargetCur(7+i, cur[i]);
 						}
 						else if(delta_q[i] < 0)
@@ -523,14 +495,6 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 							Motor_StartPos(7+i,delta_q[i]);
 						}
 					}
-
-				}
-				if(send_flag == 2)
-				{
-					/*node Îªµç»ú½Úµã£¬delta_qÎªµç»úÎ»ÖÃÔöÁ¿ mm*/
-					Motor_StartPos(7,delta_q11);
-					Motor_StartPos(8,delta_q22);
-					Motor_StartPos(9,delta_q33);
 				}
 				
 				if(print_flag==1)
@@ -538,6 +502,11 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					VS4Channal_Send(100*alpha_real,100*belta_real, 100*alpha_targ,100*belta_targ); 
 				}
 
+				if(print_flag==2)
+				{
+					VS4Channal_Send(10*cur[0],10*cur[1], 10*cur[2],1000); 
+				}
+				
 				count=0;
 
 			}

@@ -342,50 +342,41 @@ PidTypeDef PID_Pos3;
 static uint16_t count=0;
 uint16_t interval=10;
 
-float q1_real=0.0, q2_real=0.0, q3_real=0.0;//q1 2 3Êµ¼ÊÖµ
+float q_real[3]={0.0}, delta_q[3] = {0.0}, lashenq[3] = {0.0};
 float alpha_targ=0, belta_targ=0, alpha_step = 0, belta_step=0, alpha_real = 0, belta_real=0;
 
-float delta_q1=0, delta_q2=0.0, delta_q3=0.0;
-
 float deg_Node2_0_Last=0, deg_Node2_1_Last=0;
-float P2 = 0.5, P3 = 0.5;
 
 u8 send_flag=0;
-float deg_yuzhi[2]={0.3, 0.3}, length_yuzhi_shen=3, length_yuzhi_la=8, deg_thred[2] = {0.1, 0.2};
-float bengjindu_adjust[3] = {0.4, 0.4, 0.4}, bengjindu = 0.0, length_yuzhi_la_adjust[2] = {0.4, 0.8}, coffience[2] = {0.0, 0.0};
-float bengjindu1 = 0.0, bengjindu2 = 0.0, bengjindu3 = 0.0;
-float P=0.1;
-float alpha_targ0=0, belta_targ0=0;
+float deg_yuzhi[2]={0.1, 0.1};
+float P=0.15, P_cur = 20;
 	
-u8 print_flag=0, stable_flag = 0, stable_num = 0, run_flag = 0;//´òÓ¡flag
-int32_t qc_actu_q1,qc_actu_q2,qc_actu_q3;//Êµ¼Êµç»úEPOS·µ»ØÇý¶¯qcÁ¿
-float pos_actu_q1=0, pos_actu_q2=0.0, pos_actu_q3=0.0;
+u8 print_flag=0, adjust_flag[3] = {0, 0, 0}, addeg_flag[2] = {0, 0};
 
 float delta_q11=0.0, delta_q22=0.0, delta_q33=0.0;//ÊÖ¶¯µ÷½Úµç»úÓÃ
 
-float deg_kuadu=3, phi_n = -30;
-
-u8 adjust_flag[3] = {0, 0, 0}, addeg_flag[2] = {0, 0};
+float deg_kuadu=3, phi_n = -30, angle0_alpha = 0, angle0_belta = 0;
 
 uint32_t kk=0;
-u8 start_flag=0;//¿ªÊ¼×ßÔ²
-u8 count_1=0;//×ßÔ²ÖÜÆÚ¿ØÖÆ±äÁ¿
-u8 speed = 15;//¿ØÖÆÃ¿¼¸¸öÖÜÆÚ×ßÒ»¸öµã
+uint16_t cur[3] = {250, 200, 200}, cur0[3] = {200, 180, 180}, cur_max[3] = {400, 400, 400}, cur_min[3] = {100, 80, 80};
+int32_t qc_actu_q[3] = {0};
+u8 start_flag=0, count_1=0, speed = 15;//¿ØÖÆÃ¿¼¸¸öÖÜÆÚ×ßÒ»¸öµã
+u8 cur_flag[3] = {0}, pos_flag[3] = {1}, zero_flag = 0;
 
-float lashenq1, lashenq2, lashenq3, d_l = 24.7, bjin_yuzhi = 0.0005;
+float d_l = 24.7, bengjin_dead = 0.5, pos_actu_q[3] = {0.0};
 
 void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 {	
-	
+	u8 i, j;
 	if(TIM_GetITStatus(TIMforTASK,TIM_IT_Update)!=RESET)
 	{
 		TIM_ClearITPendingBit(TIMforTASK,TIM_IT_Update);		
 		
-		if(count==interval) 
+		if(count>=interval) 
 			{		
 				/*»ñÈ¡µçÎ»¼Æ¶ÁÊý£¬²¢×ª»»³É½Ç¶ÈÖµ*/
-				//PotPin_Node2_GetValue();
-				PotPin_Node1_GetValue();
+				PotPin_Node2_GetValue();
+				//PotPin_Node1_GetValue();
 				
 				{//¶ÔµçÎ»¼Æ¶ÁÊýÏÞ·ù
 					if( fabs(deg_Node2[0]-deg_Node2_0_Last) >=deg_kuadu)
@@ -395,13 +386,17 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					
 					deg_Node2_0_Last=deg_Node2[0];
 					deg_Node2_1_Last=deg_Node2[1];
-					alpha_real = deg_Node2[0];
-					belta_real = deg_Node2[1];
 					
 				}
-//				qc_actu_q1=EPOS_SDOReadActualPos(7);
-//				qc_actu_q2=EPOS_SDOReadActualPos(8);
-//				qc_actu_q3=EPOS_SDOReadActualPos(9);
+				if(zero_flag == 1)
+				{
+					zero_flag = 0;
+					angle0_alpha = deg_Node2[0];
+					angle0_belta = deg_Node2[1];
+				}
+				
+				alpha_real = deg_Node2[0] - angle0_alpha;
+				belta_real = deg_Node2[1] - angle0_belta;
 				
 				//ÅÜÔ²¸øÄ¿±êalpha belta
 				if(start_flag==1)
@@ -447,279 +442,92 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 				}
 				
 				//¼ÆËãÊµ¼Ê3¸ùÉþ ¿×¼ä¾àÀë
-				q1_real=q_calc(alpha_real,belta_real, phi_n, 0);
-				q2_real=q_calc(alpha_real,belta_real, phi_n, 1);
-				q3_real=q_calc(alpha_real,belta_real, phi_n, 2);
-				
 				alpha_step = alpha_real + P * (alpha_targ - alpha_real);
-					belta_step = belta_real + P * (belta_targ - belta_real);
+				belta_step = belta_real + P * (belta_targ - belta_real);
 					
-					delta_q1= q1_real - q_calc(alpha_step,belta_step, phi_n, 0);
-					delta_q2= q2_real - q_calc(alpha_step,belta_step, phi_n, 1);
-					delta_q3= q3_real - q_calc(alpha_step,belta_step, phi_n, 2);
-				
-				if(fabs(alpha_real-alpha_targ) < deg_yuzhi[0])
+				for(i = 0; i < 3; i++)
 				{
-					addeg_flag[0] = 1;
-				}
-				else
-				{
-					addeg_flag[0] = 0;
-				}
-				
-				if(addeg_flag[0] == 0)
-				{
-					deg_yuzhi[0] = deg_thred[0];
-				}
-				if(addeg_flag[0] == 1)
-				{
-					deg_yuzhi[0] = deg_thred[1];
-				}
-				
-				if(fabs(belta_real-belta_targ) < deg_yuzhi[1])
-				{
-					addeg_flag[1] = 1;
-				}
-				else
-				{
-					addeg_flag[1] = 0;
-				}
-				
-				if(addeg_flag[1] == 0)
-				{
-					deg_yuzhi[1] = deg_thred[0];
-				}
-				if(addeg_flag[1] == 1)
-				{
-					deg_yuzhi[1] = deg_thred[1];
+					q_real[i] = q_calc(alpha_real,belta_real, phi_n, i);
+					delta_q[i] = q_real[i] - q_calc(alpha_step,belta_step, phi_n, i);
+					
+					//read encoders and calculate lashen value
+					qc_actu_q[i]=EPOS_SDOReadActualPos(7+i);
+					pos_actu_q[i]=(float)qc_actu_q[i]*(12.0/4/512/157.464);
+					lashenq[i] = pos_actu_q[i]-(d_l-q_real[i]);
 				}
 				
 				//½Ç¶ÈÅÐ¶Ï=0µÄãÐÖµ£¬ÔÚÎó²îãÐÖµ·¶Î§¼´²»¸øµç»úÇý¶¯Á¿
 				if( (fabs(alpha_real-alpha_targ)< deg_yuzhi[0]) && (fabs(belta_real-belta_targ)< deg_yuzhi[1]))
 				{
-					delta_q1=0;
-					delta_q2=0;
-					delta_q3=0;
-					
-					if(stable_flag == 0)
+					for(i = 0; i < 3; i++)
 					{
-						stable_flag = 1;
-						if(stable_num == 0)
-						{
-							alpha_targ0 = alpha_targ;
-							belta_targ0 = belta_targ;
-							delta_q1=- P3 * (lashenq1 - bengjindu);
-							delta_q2=- P3 * (lashenq2 - bengjindu);
-							delta_q3=- P3 * (lashenq3 - bengjindu);
-						}
-						stable_num++;
-						if(stable_num > 3)
-						{
-							stable_num = 0;
-							run_flag = 1;
-						}
+						delta_q[i] = 0;
+						cur[i] = cur0[i];
 					}
 				}
 				else
 				{
-					if((fabs(alpha_targ0-alpha_targ)<0.01) && (fabs(belta_targ0-belta_targ)<0.01) && (stable_flag == 1))
+					for(i = 0; i < 3; i++)
 					{
-						stable_flag = 0;
+						if((delta_q[i]<0) && (fabs(lashenq[i]) > bengjin_dead))
+						{
+							if(lashenq[i] > 0)
+							{
+								for(j = 0; j < 3; j++)
+								{
+									if(delta_q[j] > 0)
+										cur[j] = cur[j] - P_cur*(lashenq[i] - bengjin_dead);
+									if(cur[j] < cur_min[j])
+										cur[j] = cur_min[j];
+								}
+							}
+							else
+							{
+								for(j = 0; j < 3; j++)
+								{
+									if(delta_q[j] > 0)
+										cur[j] = cur[j] - P_cur*(lashenq[i] + bengjin_dead);
+									if(cur[j] > cur_max[j])
+										cur[j] = cur_max[j];
+								}
+							}
+						}
 					}
-					else if((fabs(alpha_targ0-alpha_targ)>0.01) || (fabs(belta_targ0-belta_targ)>0.01))
-					{
-						stable_num = 0;
-						run_flag = 0;
-						stable_flag = 0;
-					}
-				}
-					
-				pos_actu_q1=(float)qc_actu_q1*12.0/4/512/157.464;
-				lashenq1 = pos_actu_q1-(d_l-q1_real);
-				
-				pos_actu_q2=(float)qc_actu_q2*12.0/4/512/157.464;
-				lashenq2 = pos_actu_q2-(d_l-q2_real);
-					
-				pos_actu_q3=(float)qc_actu_q3*12.0/4/512/157.464;
-				lashenq3 = pos_actu_q3-(d_l-q3_real);
-				
-				//¶Ôq1ÏÞ·ù
-				if(delta_q1<0)
-				{
-//					if( -lashenq1 >length_yuzhi_shen)
-//					{
-//						delta_q1=0;
-//					}
-					delta_q1 = delta_q1 - P2 * (lashenq1 - bengjindu);
-				}
-				else if(delta_q1>0)
-				{		
-					if( lashenq1 >length_yuzhi_la)
-					{
-						delta_q1=0;
-					}		
-				}
-
-		    //¶Ôq2ÏÞ·ù
-				if(delta_q2<0)
-				{
-//					if( -lashenq2 >length_yuzhi_shen)
-//					{
-//						delta_q2=0;
-//					}
-					delta_q2 = delta_q2 - P2 * (lashenq2 - bengjindu);
-				}
-				else if(delta_q2>0)
-				{		
-					if( lashenq2 >length_yuzhi_la)
-					{
-						delta_q2=0;
-					}		
-				}
-				//¶Ôq3ÏÞ·ù
-				if(delta_q3<0)
-				{
-//					if( -lashenq3 >length_yuzhi_shen)
-//					{
-//						delta_q3=0;
-//					}
-					delta_q3 = delta_q3 - P2 * (lashenq3 - bengjindu);
-				}
-				else if(delta_q3>0)
-				{		
-					if( lashenq3 >length_yuzhi_la)
-					{
-						delta_q3=0;
-					}		
 				}
 				
-				
-				//¿ØÖÆÈýÉþµÄ±Á½ô¶È
-				if((fabs(delta_q1) < bjin_yuzhi) && (fabs(delta_q2) < bjin_yuzhi) && (fabs(delta_q3) < bjin_yuzhi) && (run_flag == 0))
-				{
-					if(fabs(lashenq1-bengjindu) < bengjindu_adjust[0])
-					{
-						adjust_flag[0] = 1;
-					}
-					else
-					{
-						adjust_flag[0] = 0;
-					}
-					
-					if(adjust_flag[0] == 0)
-					{
-						bengjindu_adjust[0] = length_yuzhi_la_adjust[0];
-					}
-					if(adjust_flag[0] == 1)
-					{
-						bengjindu_adjust[0] = length_yuzhi_la_adjust[1];
-					}
-					
-					if(fabs(lashenq1-bengjindu) < bengjindu_adjust[0])
-					{
-						delta_q1 = 0;
-					}
-					else
-					{
-						if( lashenq1 > bengjindu)
-						{
-								delta_q1 = - coffience[0] * (lashenq1 - bengjindu);
-						}
-						else
-						{
-								delta_q1 = - coffience[1] * (lashenq1 - bengjindu);
-							
-						}
-				  }
-					
-					if(fabs(lashenq2-bengjindu) < bengjindu_adjust[1])
-					{
-						adjust_flag[1] = 1;
-					}
-					else
-					{
-						adjust_flag[1] = 0;
-					}
-					
-					if(adjust_flag[1] == 0)
-					{
-						bengjindu_adjust[1] = length_yuzhi_la_adjust[0];
-					}
-					if(adjust_flag[1] == 1)
-					{
-						bengjindu_adjust[1] = length_yuzhi_la_adjust[1];
-					}
-					
-					if(fabs(lashenq2-bengjindu) < bengjindu_adjust[1])
-					{
-						delta_q2 = 0;
-					}
-					else
-					{
-						if( lashenq2 > bengjindu)
-						{
-								delta_q2 = - coffience[0] * (lashenq2 - bengjindu);
-						}
-						else
-						{
-								delta_q2 = - coffience[1] * (lashenq2 - bengjindu);
-						}
-			  	}
-
-					if(fabs(lashenq3-bengjindu) < bengjindu_adjust[2])
-					{
-						adjust_flag[2] = 1;
-					}
-					else
-					{
-						adjust_flag[2] = 0;
-					}
-					
-					if(adjust_flag[2] == 0)
-					{
-						bengjindu_adjust[2] = length_yuzhi_la_adjust[0];
-					}
-					if(adjust_flag[2] == 1)
-					{
-						bengjindu_adjust[2] = length_yuzhi_la_adjust[1];
-					}
-					
-					if(fabs(lashenq3-bengjindu) < bengjindu_adjust[2])
-					{
-						delta_q3 = 0;
-					}
-					else
-					{
-						if( lashenq3 > bengjindu)
-						{
-								delta_q3 = - coffience[0] * (lashenq3 - bengjindu);
-						}
-						else
-						{
-								delta_q3 = - coffience[1] * (lashenq3 - bengjindu);
-						}
-				}
-			}
-				
-			  if((fabs(alpha_targ) > 30) || (fabs(belta_targ) > 30))
-				{
-					delta_q1 = 0;
-					delta_q2 = 0;
-					delta_q3 = 0;
-				}
 				
 				if(send_flag == 1)
 				{
-					
-				/*node Îªµç»ú½Úµã£¬delta_qÎªµç»úÎ»ÖÃÔöÁ¿ mm*/
-					Motor_StartPos(7,delta_q1);
-					Motor_StartPos(8,delta_q2);
-					Motor_StartPos(9,delta_q3);
+					for(i = 0; i < 3; i++)
+					{
+						if(delta_q[i]>0)
+						{		
+							pos_flag[i] = 0;
+							if(cur_flag[i] == 0)
+							{
+								Switchto_cur(7+i);
+								cur_flag[i] = 1;
+							}
+							
+							EPOS_SDOSetTargetCur(7+i, cur[i]);
+						}
+						else if(delta_q[i] < 0)
+						{
+							cur_flag[i] = 0;
+							if(pos_flag[i] == 0)
+							{
+								Switchto_pos(7 + i);
+								pos_flag[i] = 1;
+							}
+							
+							Motor_StartPos(7+i,delta_q[i]);
+						}
+					}
+
 				}
 				if(send_flag == 2)
 				{
-					
-				/*node Îªµç»ú½Úµã£¬delta_qÎªµç»úÎ»ÖÃÔöÁ¿ mm*/
+					/*node Îªµç»ú½Úµã£¬delta_qÎªµç»úÎ»ÖÃÔöÁ¿ mm*/
 					Motor_StartPos(7,delta_q11);
 					Motor_StartPos(8,delta_q22);
 					Motor_StartPos(9,delta_q33);
@@ -728,14 +536,6 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 				if(print_flag==1)
 				{
 					VS4Channal_Send(100*alpha_real,100*belta_real, 100*alpha_targ,100*belta_targ); 
-				}
-				else if(print_flag == 2)
-				{
-					VS4Channal_Send(0 + 1000 * lashenq1, 0 + 1000 * lashenq2, 0 + 1000 * lashenq3, 0 + 1000 * bengjindu1);
-				}
-				if(print_flag==3)
-				{
-					VS4Channal_Send(value1/10,value2/10, value3/10,value4/10); 
 				}
 
 				count=0;

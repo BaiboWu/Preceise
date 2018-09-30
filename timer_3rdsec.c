@@ -349,20 +349,21 @@ float deg_Node2_0_Last=0, deg_Node2_1_Last=0;
 
 u8 send_flag=0, print_flag=0;
 float delta_ang = 0.0, deg_yuzhi[2]={0.1, 0.1};
-float P=0.15, P_cur = 6000.0;
+float P=0.15, P_belta = 0.15, P_cur = 8000.0;
 float deg_kuadu=3, phi_n = -30, angle0_alpha = 0, angle0_belta = 0;
 
-uint32_t kk=0;
+uint32_t kk=0, m_encoder[3] = {0};
 uint16_t cur[3], cur_max[3] = {320, 300, 300}, cur_min[3] = {120, 100, 100};
 
 u8 start_flag=0, count_1=0, speed = 15;//¿ØÖÆÃ¿¼¸¸öÖÜÆÚ×ßÒ»¸öµã
 u8 cur_flag[3] = {0}, pos_flag[3] = {1}, zero_flag = 0;
+u8 switch_flag = 0, k0 = 0, k = 0;
 
-float d_l = 24.7;
+float d_l = 24.7, loose_max = -3, tension_max = 10, motor_q[3] = {0.0}, lashen[3] = {0.0};
 
 void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 {	
-	u8 i;
+	u8 i, j;
 	if(TIM_GetITStatus(TIMforTASK,TIM_IT_Update)!=RESET)
 	{
 		TIM_ClearITPendingBit(TIMforTASK,TIM_IT_Update);		
@@ -393,6 +394,10 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 				alpha_real = deg_Node2[0] - angle0_alpha;
 				belta_real = deg_Node2[1] - angle0_belta;
 				
+				for(i = 0;i < 3; i++)
+				{
+					//m_encoder[i] = EPOS_SDOReadActualPos(7+i);
+				}
 				//ÅÜÔ²¸øÄ¿±êalpha belta
 				if(start_flag==1)
 				{
@@ -442,7 +447,7 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 					delta_ang = 1.0 * (delta_ang/fabs(delta_ang));
 				alpha_step = alpha_real + delta_ang;
 				
-				delta_ang = P * (belta_targ - belta_real);
+				delta_ang = P_belta * (belta_targ - belta_real);
 				if(fabs(delta_ang) > 1.0)
 					delta_ang = 1.0 * (delta_ang/fabs(delta_ang));
 				belta_step = belta_real + delta_ang;
@@ -451,6 +456,10 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 				{
 					q_real[i] = q_calc(alpha_real,belta_real, phi_n, i);
 					delta_q[i] = q_real[i] - q_calc(alpha_step,belta_step, phi_n, i);
+					//read Encoders and calculate deformation
+					
+//					motor_q[i] = m_encoder[i]*(12.0/4.0/512.0/157.464);
+//					lashen[i] = motor_q[i] - (d_l - q_real[i]);
 				}
 				
 				//½Ç¶ÈÅÐ¶Ï=0µÄãÐÖµ£¬ÔÚÎó²îãÐÖµ·¶Î§¼´²»¸øµç»úÇý¶¯Á¿
@@ -464,9 +473,15 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 							
 				if(send_flag == 1)
 				{
-					for(i = 0; i < 3; i++)
+					switch_flag = 0;
+					k = k0;
+					for(j = k+1; j < k+4; j++)
 					{
-						if(delta_q[i] >= 0)
+						if(j > 2)
+							i = j - 3;
+						else
+							i = j;
+						if((delta_q[i] > 0) && (switch_flag == 0))
 						{		
 							pos_flag[i] = 0;
 							if(cur_flag[i] == 0)
@@ -475,15 +490,24 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 								cur_flag[i] = 1;
 							}
 							
-							cur[i] = cur_min[i] + P_cur * delta_q[i];
-							if(cur[i] > cur_max[i])
-							{
-								cur[i] = cur_max[i];
-							}
+							cur[i] = cur_max[i];
+							
+//							cur[i] = cur_min[i] + P_cur * delta_q[i];
+//							if(cur[i] > cur_max[i])
+//							{
+//								cur[i] = cur_max[i];
+//							}
+//							
+//							if(lashen[i] > tension_max)
+//							{
+//								cur[i] = 0;
+//							}
 					
 							EPOS_SDOSetTargetCur(7+i, cur[i]);
+							switch_flag = 1;
+							k0 = i;
 						}
-						else if(delta_q[i] < 0)
+						else
 						{
 							cur_flag[i] = 0;
 							if(pos_flag[i] == 0)
@@ -491,8 +515,12 @@ void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 								Switchto_pos(7 + i);
 								pos_flag[i] = 1;
 							}
-							
 							Motor_StartPos(7+i,delta_q[i]);
+//							if(lashen[i] > loose_max)
+//							{
+//								Motor_StartPos(7+i,delta_q[i]);
+//							}
+							
 						}
 					}
 				}

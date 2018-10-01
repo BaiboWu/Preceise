@@ -1,35 +1,4 @@
-#include "Timer.h"
-
-#define TIMforTASK TIM2
-
-/*TIM2:ÖÐ¶ÏÈÎÎñ´¦ÀíÅäÖÃ*/
-void TIM_Task_Config(void)
-{
-	TIM_TimeBaseInitTypeDef TIM_TASK_TimeBase;
-	NVIC_InitTypeDef NVIC_TIM_TASK;
-	
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2,ENABLE);//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
-	
-	/**/
-	TIM_DeInit(TIMforTASK);
-	TIM_TASK_TimeBase.TIM_Prescaler=20-1;	
-	TIM_TASK_TimeBase.TIM_Period=4200-1;//84MHz/20/4200=1KHzÖÐ¶ÏÆµÂÊ
-	TIM_TASK_TimeBase.TIM_CounterMode=TIM_CounterMode_Up;
-	TIM_TASK_TimeBase.TIM_ClockDivision=TIM_CKD_DIV1;
-	TIM_TASK_TimeBase.TIM_RepetitionCounter=0;
-	TIM_TimeBaseInit(TIMforTASK,&TIM_TASK_TimeBase);//
-
-	TIM_ClearITPendingBit(TIMforTASK,TIM_IT_Update);//ÏÈÇå¸üÐÂÖÐ¶Ï±êÖ¾Î»£¬±ÜÃâÒ»¿ªÍê¸üÐÂÖÐ¶Ï¾ÍÁ¢Âí½ø¸üÐÂÖÐ¶Ï
-	TIM_ITConfig(TIMforTASK,TIM_IT_Update,ENABLE);
-	/*TIMforTASKÖÐ¶ÏÅäÖÃ*/
-	NVIC_TIM_TASK.NVIC_IRQChannel=TIM2_IRQn;//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
-	NVIC_TIM_TASK.NVIC_IRQChannelPreemptionPriority=3;
-	NVIC_TIM_TASK.NVIC_IRQChannelSubPriority=0;
-	NVIC_TIM_TASK.NVIC_IRQChannelCmd=ENABLE;
-	NVIC_Init(&NVIC_TIM_TASK);	
-		
-	TIM_Cmd(TIMforTASK, ENABLE);
-}
+#include "algorithm.h"
 
 //PID structure
 PidTypeDef PID_Pos1, PID_Pos2, PID_Pos3;
@@ -41,9 +10,6 @@ float sec2_ang[2][441]={0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 
 0.000, -0.500, -1.000, -1.500, -2.000, -2.500, -3.000, -3.500, -4.000, -4.500, -5.000, -5.500, -6.000, -6.500, -7.000, -7.500, -8.000, -8.500, -9.000, -9.500, -10.000, -10.500, -11.000, -11.500, -12.000, -12.500, -13.000, -13.500, -14.000, -14.500, -15.000, -15.500, -16.000, -16.500, -17.000, -17.500, -18.000, -18.500, -19.000, -19.500, -20.000, -19.997, -19.989, -19.975, -19.955, -19.930, -19.899, -19.863, -19.821, -19.773, -19.720, -19.661, -19.597, -19.527, -19.451, -19.370, -19.283, -19.191, -19.094, -18.990, -18.882, -18.768, -18.648, -18.523, -18.392, -18.256, -18.115, -17.968, -17.816, -17.658, -17.495, -17.327, -17.154, -16.975, -16.791, -16.602, -16.407, -16.208, -16.004, -15.794, -15.579, -15.360, -15.135, -14.906, -14.672, -14.433, -14.189, -13.941, -13.688, -13.430, -13.168, -12.901, -12.630, -12.355, -12.076, -11.792, -11.504, -11.213, -10.917, -10.617, -10.314, -10.007, -9.697, -9.383, -9.065, -8.745, -8.421, -8.094, -7.764, -7.431, -7.096, -6.758, -6.417, -6.074, -5.729, -5.382, -5.032, -4.681, -4.328, -3.973, -3.616, -3.259, -2.900, -2.540, -2.179, -1.817, -1.454, -1.091, -0.728, -0.364, 0.000, 0.364, 0.728, 1.091, 1.454, 1.817, 2.179, 2.540, 2.900, 3.259, 3.616, 3.973, 4.328, 4.681, 5.032, 5.382, 5.729, 6.074, 6.417, 6.758, 7.096, 7.431, 7.764, 8.094, 8.421, 8.745, 9.065, 9.383, 9.697, 10.007, 10.314, 10.617, 10.917, 11.213, 11.504, 11.792, 12.076, 12.355, 12.630, 12.901, 13.168, 13.430, 13.688, 13.941, 14.189, 14.433, 14.672, 14.906, 15.135, 15.360, 15.579, 15.794, 16.004, 16.208, 16.407, 16.602, 16.791, 16.975, 17.154, 17.327, 17.495, 17.658, 17.816, 17.968, 18.115, 18.256, 18.392, 18.523, 18.648, 18.768, 18.882, 18.990, 19.094, 19.191, 19.283, 19.370, 19.451, 19.527, 19.597, 19.661, 19.720, 19.773, 19.821, 19.863, 19.899, 19.930, 19.955, 19.975, 19.989, 19.997, 20.000, 19.997, 19.989, 19.975, 19.955, 19.930, 19.899, 19.863, 19.821, 19.773, 19.720, 19.661, 19.597, 19.527, 19.451, 19.370, 19.283, 19.191, 19.094, 18.990, 18.882, 18.768, 18.648, 18.523, 18.392, 18.256, 18.115, 17.968, 17.816, 17.658, 17.495, 17.327, 17.154, 16.975, 16.791, 16.602, 16.407, 16.208, 16.004, 15.794, 15.579, 15.360, 15.135, 14.906, 14.672, 14.433, 14.189, 13.941, 13.688, 13.430, 13.168, 12.901, 12.630, 12.355, 12.076, 11.792, 11.504, 11.213, 10.917, 10.617, 10.314, 10.007, 9.697, 9.383, 9.065, 8.745, 8.421, 8.094, 7.764, 7.431, 7.096, 6.758, 6.417, 6.074, 5.729, 5.382, 5.032, 4.681, 4.328, 3.973, 3.616, 3.259, 2.900, 2.540, 2.179, 1.817, 1.454, 1.091, 0.728, 0.364, 0.000, -0.364, -0.728, -1.091, -1.454, -1.817, -2.179, -2.540, -2.900, -3.259, -3.616, -3.973, -4.328, -4.681, -5.032, -5.382, -5.729, -6.074, -6.417, -6.758, -7.096, -7.431, -7.764, -8.094, -8.421, -8.745, -9.065, -9.383, -9.697, -10.007, -10.314, -10.617, -10.917, -11.213, -11.504, -11.792, -12.076, -12.355, -12.630, -12.901, -13.168, -13.430, -13.688, -13.941, -14.189, -14.433, -14.672, -14.906, -15.135, -15.360, -15.579, -15.794, -16.004, -16.208, -16.407, -16.602, -16.791, -16.975, -17.154, -17.327, -17.495, -17.658, -17.816, -17.968, -18.115, -18.256, -18.392, -18.523, -18.648, -18.768, -18.882, -18.990, -19.094, -19.191, -19.283, -19.370, -19.451, -19.527, -19.597, -19.661, -19.720, -19.773, -19.821, -19.863, -19.899, -19.930, -19.955, -19.975, -19.989, -19.997, -20.000, -19.500, -19.000, -18.500, -18.000, -17.500, -17.000, -16.500, -16.000, -15.500, -15.000, -14.500, -14.000, -13.500, -13.000, -12.500, -12.000, -11.500, -11.000, -10.500, -10.000, -9.500, -9.000, -8.500, -8.000, -7.500, -7.000, -6.500, -6.000, -5.500, -5.000, -4.500, -4.000, -3.500, -3.000, -2.500, -2.000, -1.500, -1.000, -0.500, 0.000};
 float sec3_ang[2][441]={0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.364, 0.728, 1.091, 1.454, 1.817, 2.179, 2.540, 2.900, 3.259, 3.616, 3.973, 4.328, 4.681, 5.032, 5.382, 5.729, 6.074, 6.417, 6.758, 7.096, 7.431, 7.764, 8.094, 8.421, 8.745, 9.065, 9.383, 9.697, 10.007, 10.314, 10.617, 10.917, 11.213, 11.504, 11.792, 12.076, 12.355, 12.630, 12.901, 13.168, 13.430, 13.688, 13.941, 14.189, 14.433, 14.672, 14.906, 15.135, 15.360, 15.579, 15.794, 16.004, 16.208, 16.407, 16.602, 16.791, 16.975, 17.154, 17.327, 17.495, 17.658, 17.816, 17.968, 18.115, 18.256, 18.392, 18.523, 18.648, 18.768, 18.882, 18.990, 19.094, 19.191, 19.283, 19.370, 19.451, 19.527, 19.597, 19.661, 19.720, 19.773, 19.821, 19.863, 19.899, 19.930, 19.955, 19.975, 19.989, 19.997, 20.000, 19.997, 19.989, 19.975, 19.955, 19.930, 19.899, 19.863, 19.821, 19.773, 19.720, 19.661, 19.597, 19.527, 19.451, 19.370, 19.283, 19.191, 19.094, 18.990, 18.882, 18.768, 18.648, 18.523, 18.392, 18.256, 18.115, 17.968, 17.816, 17.658, 17.495, 17.327, 17.154, 16.975, 16.791, 16.602, 16.407, 16.208, 16.004, 15.794, 15.579, 15.360, 15.135, 14.906, 14.672, 14.433, 14.189, 13.941, 13.688, 13.430, 13.168, 12.901, 12.630, 12.355, 12.076, 11.792, 11.504, 11.213, 10.917, 10.617, 10.314, 10.007, 9.697, 9.383, 9.065, 8.745, 8.421, 8.094, 7.764, 7.431, 7.096, 6.758, 6.417, 6.074, 5.729, 5.382, 5.032, 4.681, 4.328, 3.973, 3.616, 3.259, 2.900, 2.540, 2.179, 1.817, 1.454, 1.091, 0.728, 0.364, 0.000, -0.364, -0.728, -1.091, -1.454, -1.817, -2.179, -2.540, -2.900, -3.259, -3.616, -3.973, -4.328, -4.681, -5.032, -5.382, -5.729, -6.074, -6.417, -6.758, -7.096, -7.431, -7.764, -8.094, -8.421, -8.745, -9.065, -9.383, -9.697, -10.007, -10.314, -10.617, -10.917, -11.213, -11.504, -11.792, -12.076, -12.355, -12.630, -12.901, -13.168, -13.430, -13.688, -13.941, -14.189, -14.433, -14.672, -14.906, -15.135, -15.360, -15.579, -15.794, -16.004, -16.208, -16.407, -16.602, -16.791, -16.975, -17.154, -17.327, -17.495, -17.658, -17.816, -17.968, -18.115, -18.256, -18.392, -18.523, -18.648, -18.768, -18.882, -18.990, -19.094, -19.191, -19.283, -19.370, -19.451, -19.527, -19.597, -19.661, -19.720, -19.773, -19.821, -19.863, -19.899, -19.930, -19.955, -19.975, -19.989, -19.997, -20.000, -19.997, -19.989, -19.975, -19.955, -19.930, -19.899, -19.863, -19.821, -19.773, -19.720, -19.661, -19.597, -19.527, -19.451, -19.370, -19.283, -19.191, -19.094, -18.990, -18.882, -18.768, -18.648, -18.523, -18.392, -18.256, -18.115, -17.968, -17.816, -17.658, -17.495, -17.327, -17.154, -16.975, -16.791, -16.602, -16.407, -16.208, -16.004, -15.794, -15.579, -15.360, -15.135, -14.906, -14.672, -14.433, -14.189, -13.941, -13.688, -13.430, -13.168, -12.901, -12.630, -12.355, -12.076, -11.792, -11.504, -11.213, -10.917, -10.617, -10.314, -10.007, -9.697, -9.383, -9.065, -8.745, -8.421, -8.094, -7.764, -7.431, -7.096, -6.758, -6.417, -6.074, -5.729, -5.382, -5.032, -4.681, -4.328, -3.973, -3.616, -3.259, -2.900, -2.540, -2.179, -1.817, -1.454, -1.091, -0.728, -0.364, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
 0.000, -0.500, -1.000, -1.500, -2.000, -2.500, -3.000, -3.500, -4.000, -4.500, -5.000, -5.500, -6.000, -6.500, -7.000, -7.500, -8.000, -8.500, -9.000, -9.500, -10.000, -10.500, -11.000, -11.500, -12.000, -12.500, -13.000, -13.500, -14.000, -14.500, -15.000, -15.500, -16.000, -16.500, -17.000, -17.500, -18.000, -18.500, -19.000, -19.500, -20.000, -19.997, -19.987, -19.971, -19.949, -19.921, -19.886, -19.845, -19.797, -19.743, -19.683, -19.617, -19.545, -19.466, -19.382, -19.291, -19.194, -19.091, -18.983, -18.868, -18.747, -18.621, -18.489, -18.351, -18.207, -18.058, -17.903, -17.743, -17.577, -17.406, -17.229, -17.048, -16.861, -16.669, -16.472, -16.270, -16.063, -15.852, -15.635, -15.414, -15.189, -14.959, -14.724, -14.486, -14.243, -13.995, -13.744, -13.489, -13.230, -12.967, -12.700, -12.430, -12.156, -11.878, -11.597, -11.313, -11.026, -10.736, -10.442, -10.146, -9.847, -9.545, -9.240, -8.933, -8.623, -8.311, -7.996, -7.680, -7.361, -7.040, -6.718, -6.393, -6.067, -5.739, -5.410, -5.079, -4.746, -4.413, -4.078, -3.742, -3.405, -3.067, -2.728, -2.389, -2.049, -1.708, -1.367, -1.026, -0.684, -0.342, 0.000, 0.342, 0.684, 1.026, 1.367, 1.708, 2.049, 2.389, 2.728, 3.067, 3.405, 3.742, 4.078, 4.413, 4.746, 5.079, 5.410, 5.739, 6.067, 6.393, 6.718, 7.040, 7.361, 7.680, 7.996, 8.311, 8.623, 8.933, 9.240, 9.545, 9.847, 10.146, 10.442, 10.736, 11.026, 11.313, 11.597, 11.878, 12.156, 12.430, 12.700, 12.967, 13.230, 13.489, 13.744, 13.995, 14.243, 14.486, 14.724, 14.959, 15.189, 15.414, 15.635, 15.852, 16.063, 16.270, 16.472, 16.669, 16.861, 17.048, 17.229, 17.406, 17.577, 17.743, 17.903, 18.058, 18.207, 18.351, 18.489, 18.621, 18.747, 18.868, 18.983, 19.091, 19.194, 19.291, 19.382, 19.466, 19.545, 19.617, 19.683, 19.743, 19.797, 19.845, 19.886, 19.921, 19.949, 19.971, 19.987, 19.997, 20.000, 19.997, 19.987, 19.971, 19.949, 19.921, 19.886, 19.845, 19.797, 19.743, 19.683, 19.617, 19.545, 19.466, 19.382, 19.291, 19.194, 19.091, 18.983, 18.868, 18.747, 18.621, 18.489, 18.351, 18.207, 18.058, 17.903, 17.743, 17.577, 17.406, 17.229, 17.048, 16.861, 16.669, 16.472, 16.270, 16.063, 15.852, 15.635, 15.414, 15.189, 14.959, 14.724, 14.486, 14.243, 13.995, 13.744, 13.489, 13.230, 12.967, 12.700, 12.430, 12.156, 11.878, 11.597, 11.313, 11.026, 10.736, 10.442, 10.146, 9.847, 9.545, 9.240, 8.933, 8.623, 8.311, 7.996, 7.680, 7.361, 7.040, 6.718, 6.393, 6.067, 5.739, 5.410, 5.079, 4.746, 4.413, 4.078, 3.742, 3.405, 3.067, 2.728, 2.389, 2.049, 1.708, 1.367, 1.026, 0.684, 0.342, 0.000, -0.342, -0.684, -1.026, -1.367, -1.708, -2.049, -2.389, -2.728, -3.067, -3.405, -3.742, -4.078, -4.413, -4.746, -5.079, -5.410, -5.739, -6.067, -6.393, -6.718, -7.040, -7.361, -7.680, -7.996, -8.311, -8.623, -8.933, -9.240, -9.545, -9.847, -10.146, -10.442, -10.736, -11.026, -11.313, -11.597, -11.878, -12.156, -12.430, -12.700, -12.967, -13.230, -13.489, -13.744, -13.995, -14.243, -14.486, -14.724, -14.959, -15.189, -15.414, -15.635, -15.852, -16.063, -16.270, -16.472, -16.669, -16.861, -17.048, -17.229, -17.406, -17.577, -17.743, -17.903, -18.058, -18.207, -18.351, -18.489, -18.621, -18.747, -18.868, -18.983, -19.091, -19.194, -19.291, -19.382, -19.466, -19.545, -19.617, -19.683, -19.743, -19.797, -19.845, -19.886, -19.921, -19.949, -19.971, -19.987, -19.997, -20.000, -19.500, -19.000, -18.500, -18.000, -17.500, -17.000, -16.500, -16.000, -15.500, -15.000, -14.500, -14.000, -13.500, -13.000, -12.500, -12.000, -11.500, -11.000, -10.500, -10.000, -9.500, -9.000, -8.500, -8.000, -7.500, -7.000, -6.500, -6.000, -5.500, -5.000, -4.500, -4.000, -3.500, -3.000, -2.500, -2.000, -1.500, -1.000, -0.500, 0.000};
-
-//TIM2 interrupt function 1kHz
-static u8 count=0, interval=20;
 
 //corresponding arrays for 3 sections
 float sec_ang_targ[3][2] = {0}, sec_ang_real[3][2] = {0}, sec_ang_step[3][2] = {0}, sec_ang_targ0[3][2] = {0};
@@ -58,309 +24,235 @@ float deg_yuzhi[3][2] = {0.1, 0.1, 0.1, 0.1, 0.1, 0.1};
 float lashen[3][3] = {0.0};
 
 //P parameters adjustment
-float P_ang=0.15, P_cur = 8000.0;
+float P_ang=0.10, P_cur = 8000.0;
 
 int32_t qc_actu_q[3][3] = {0};//actual encoders of motors
 float ang_zero[8] = {0}, max_tension = 10, max_loose = -3, deg_kuadu=3, d_l = 24.7;
-uint16_t cur[3][3], cur_max[3][3] = {300, 300, 300, 300, 300, 300, 300, 300, 300}, cur_min[3][3] = {80, 80, 80, 80, 80, 80, 80, 80, 80};
+uint16_t cur[3][3], cur_max[3][3] = {350, 350, 350, 350, 350, 350, 350, 350, 350}, cur_min[3][3] = {80, 80, 80, 80, 80, 80, 80, 80, 80};
 
 u8 send_flag=0, print_flag=0;
 
 uint32_t kk=0;
-u8 start_flag=0, count_1=0, speed = 10, zero_flag = 0;//¿ØÖÆÃ¿¼¸¸öÖÜÆÚ×ßÒ»¸öµã
+u8 start_flag=0, count_1=0, speed = 10, zero_flag = 0, double_flag = 0;//¿ØÖÆÃ¿¼¸¸öÖÜÆÚ×ßÒ»¸öµã
 u8 puller_idx[3] = {0}, switch_flag = 0, cur_flag[3][3] = {0}, pos_flag[3][3] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
 
-void TIM2_IRQHandler(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
+void Algorithm(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 {	
-	/*
-	//scanning for 3 keys to set flag
-	if( Key_Scan(GPIOE,GPIO_Pin_10) == KEY_ON  )	 //ÅÐ¶ÏKEY1ÊÇ·ñ°´ÏÂ
-	{
-		if(zero_flag == 0)
-		{
-			zero_flag = 1;
-		}
-		GPIO_ToggleBits(LED1);//LED1·­×ª
-	} 
-		
-	if( Key_Scan(GPIOE,GPIO_Pin_11) == KEY_ON  ) //ÅÐ¶ÏKEY2ÊÇ·ñ°´ÏÂ
-	{		
-		if(send_flag == 0)
-		{
-			send_flag = 1;
-		}
-		else if(send_flag == 1)
-		{
-			send_flag = 0;
-		}
-		GPIO_ToggleBits(LED2);//LED2·­×ª
-	} 
-	
-	if( Key_Scan(GPIOE,GPIO_Pin_12) == KEY_ON  )	 //ÅÐ¶ÏKEY3ÊÇ·ñ°´ÏÂ
-	{			
-		if(start_flag == 0)
-		{
-			start_flag = 1;
-		}
-		else if(start_flag == 1)
-		{
-			start_flag = 0;
-			send_flag = 0;
-		}
-		 GPIO_ToggleBits(LED3);//LED3·­×ª
-	}
-	*/
-	
 	u8 i, j, k, m;
 	
-	if(TIM_GetITStatus(TIMforTASK,TIM_IT_Update)!=RESET)
+	//Initial degree sensor
+	PotPin_Node1_GetValue();	
+	PotPin_Node2_GetValue();	
+	
+	//Filter out big jump
+	for(i = 0; i < 8; i++)
 	{
-		TIM_ClearITPendingBit(TIMforTASK,TIM_IT_Update);		
+		if(i > 3)
+		{
+			if( fabs(deg_Node2[i-4]-deg_Node1_Last[i]) >=deg_kuadu)
+				deg_Node2[i-4]=deg_Node1_Last[i];	
 		
-		if(count==interval) 
-			{		
-				
-				//Initial degree sensor
-				PotPin_Node1_GetValue();	
-				PotPin_Node2_GetValue();	
-				
-				//Filter out big jump
-				for(i = 0; i < 8; i++)
-				{
-					if(i > 3)
-					{
-						if( fabs(deg_Node2[i-4]-deg_Node1_Last[i]) >=deg_kuadu)
-							deg_Node2[i-4]=deg_Node1_Last[i];	
-					
-						deg_Node1_Last[i]=deg_Node2[i-4];
-					}
-					else
-					{
-						if( fabs(deg_Node1[i]-deg_Node1_Last[i]) >=deg_kuadu)
-							deg_Node1[i]=deg_Node1_Last[i];	
-					
-						deg_Node1_Last[i]=deg_Node1[i];
-					}
-				}
-				//Zero setting automatically
-				if(zero_flag == 1)
-				{
-					//EPOS_SDOSetTargetCur(8, curr);
-					GPIOE->ODR^=(1<<13);
-					
-					zero_flag = 0;
-					for(i = 0;i < 4;i++)
-					{
-						ang_zero[i] = deg_Node1[i];
-						ang_zero[i+4] = deg_Node2[i];
-					}
-				}
-				
-				for(i = 0;i < 4;i++)
-				{
-					deg_Node1[i] = deg_Node1[i] - ang_zero[i];
-					deg_Node2[i] = deg_Node2[i] - ang_zero[i+4];
-				}
-				
-				
-				//Read actual encoders
-				for(i = 0; i < 3; i++)
-				{
-					for(j = 0; j < 3; j++)
-					{
-						//sec_dst_motor[i][j] = EPOS_SDOReadActualPos(3 * i + j + 1);
-					}
-				}
-				
-				//read real degree by sensor
-				sec_ang_real[0][0] = deg_Node1[0];
-				sec_ang_real[0][1] = deg_Node1[1];
-				sec_ang_real[1][0] = deg_Node1[2];
-				sec_ang_real[1][1] = -deg_Node1[3];
-				sec_ang_real[2][0] = deg_Node2[0];
-				sec_ang_real[2][1] = deg_Node2[1];
-				
-				//set desired trajectory
-				if(start_flag != 0)
-				{
-					if(count_1==speed)
-					{
-						count_1=0;
-						if(start_flag == 1)
-						{
-							for(i = 0; i < 2; i++)
-							{
-								sec_ang_targ[0][i] = sec1_ang[i][kk];
-								//sec_ang_targ[1][i] = sec2_ang[i][kk];
-								sec_ang_targ[2][i] = sec3_ang[i][kk];
-							}
-							sec_ang_targ[1][0] = -sec2_ang[1][kk];
-							sec_ang_targ[1][1] = sec2_ang[0][kk];
-							
-							//GPIOE->ODR^=(1<<13);
-						}
-						else if(start_flag < 8)
-						{
-							i = (7 - start_flag) / 2;
-							j = (7 - start_flag) % 2;
-							sec_ang_targ[i][j] = 20 * sin(kk /441.0 * 2 * PI);
-						}
-
-						kk++;
-						if(kk>=441) kk=0;
-					}
-					count_1++;
-				}
-								
-				//PD Control with degree
-				for(i = 0; i < 3; i++)
-				{
-					for(j = 0; j < 2; j++)
-					{
-						d_ang = P_ang * (sec_ang_targ[i][j] - sec_ang_real[i][j]);
-						if(fabs(d_ang) > 1.0)
-						{
-							d_ang = 1.0 * (d_ang/fabs(d_ang));
-						}
-						sec_ang_step[i][j] = sec_ang_real[i][j] + d_ang;
-					}
-				}
-				
-				//calculate delta motion for next circle
-				for(i = 0; i < 3; i++)
-				{
-					for(j = 0; j < 3; j++)
-					{
-						sec_dst_real[i][j] = q_calc(sec_ang_real[i][0], sec_ang_real[i][1], sec_phi[i], j);
-						sec_dst_step[i][j] = q_calc(sec_ang_step[i][0], sec_ang_step[i][1], sec_phi[i], j);
-						if(i == 0)
-							sec_delta_dst[i][j] = sec_dst_real[i][j] - sec_dst_step[i][j];
-					}
-				}
-				//Add extra motion for behind sections
-				for(j = 0; j < 3; j++)
-				{
-					//#section 2
-					sec_dst_real[1][j] = sec_dst_real[1][j] + q_calc(sec_ang_real[0][0], sec_ang_real[0][1], 0, j);
-					sec_dst_step[1][j] = sec_dst_step[1][j] + q_calc(sec_ang_step[0][0], sec_ang_step[0][1], 0, j);
-					sec_delta_dst[1][j] = sec_dst_real[1][j] - sec_dst_step[1][j];
-					
-					//#section 3
-					sec_dst_real[2][j] = sec_dst_real[2][j] + q_calc(sec_ang_real[0][0], sec_ang_real[0][1], -30, j) + q_calc(sec_ang_real[1][0], sec_ang_real[1][1], -120, j);
-					sec_dst_step[2][j] = sec_dst_step[2][j] + q_calc(sec_ang_step[0][0], sec_ang_step[0][1], -30, j) + q_calc(sec_ang_step[1][0], sec_ang_step[1][1], -120, j);
-					sec_delta_dst[2][j] = sec_dst_real[2][j] - sec_dst_step[2][j];
-				}
-				
-				//Check whether lies in the threshold and The back section is checked behind former.
-				for(i = 0; i < 3; i++)
-				{
-					if((fabs(sec_ang_targ[i][0]-sec_ang_real[i][0])< deg_yuzhi[i][0]) && (fabs(sec_ang_targ[i][1]-sec_ang_real[i][1])< deg_yuzhi[i][1]))
-					{
-						for(j = 0; j < 3; j++)
-						{
-							sec_delta_dst[i][j] = 0;
-						}
-					}
-					else
-					{
-						break;
-					}
-				}
-				
-				//Send motor servo command
-				//Send command automatic
-				if(send_flag == 1)
-				{
-					for(i = 0; i < 3; i++)
-					{
-						switch_flag = 0;
-						m = puller_idx[i];
-						for(k = m + 1; k < m + 4; k++)
-						{
-							if(k > 2)
-								j = k - 3;
-							else
-								j = k;
-							
-//							sec_dst_motor[i][j] = sec_dst_motor[i][j]*(12.0/4.0/512.0/157.464);
-//							lashen[i][j] = sec_dst_motor[i][j] - ((i+1) * d_l - sec_dst_real[i][j]);
-//							
-							if((sec_delta_dst[i][j] > 0) && (switch_flag == 0))
-							{		
-								pos_flag[i][j] = 0;
-								if(cur_flag[i][j] == 0)
-								{
-									Switchto_cur(3 * i + j + 1);
-									cur_flag[i][j] = 1;
-								}
-								
-								cur[i][j] = cur_max[i][j];
-								
-//								cur[i][j] = cur_min[i][j] + P_cur * sec_dst_real[i][j];
-//								
-//								if(cur[i][j] > cur_max[i][j])
-//								{
-//									cur[i][j] = cur_max[i][j];
-//								}
-								
-//								if(lashen[i][j] > max_tension)
-//								{
-//									cur[i][j] = 0;
-//								}
-						
-								EPOS_SDOSetTargetCur(3 * i + j + 1, cur[i][j]);
-								switch_flag = 1;
-								puller_idx[i] = j;
-							}
-							else
-							{
-								cur_flag[i][j] = 0;
-								if(pos_flag[i][j] == 0)
-								{
-									Switchto_pos(3 * i + j + 1);
-									pos_flag[i][j] = 1;
-								}
-								
-								Motor_StartPos(3 * i + j + 1,sec_delta_dst[i][j]);
-//								if(lashen[i][j] > max_loose)
-//								{
-//									Motor_StartPos(3 * i + j + 1,sec_delta_dst[i][j]);
-//								}
-							}
-						}
-					}
-				}
-				//Send command manually
-				if(send_flag == 2)
-				{
-					for(i = 0; i < 3; i++)
-					{
-						for(j = 0; j < 3; j++)
-						{
-							Motor_StartPos(3 * i + j + 1, sec_delta_dst1[i][j]);
-						}
-					}
-				}
-				
-				if(print_flag==1)
-				{
-					VS4Channal_Send(100*sec_ang_real[0][0],100*sec_ang_real[0][1],100*sec_ang_real[1][0], 100*sec_ang_real[1][1]); 
-				}
-				if(print_flag == 2)
-				{
-					VS4Channal_Send(100*sec_ang_real[2][0],100*sec_ang_real[2][1],100*sec_ang_targ[2][0], 100*sec_ang_targ[2][1]);
-				}
-				if(print_flag > 3)
-				{
-					//VS4Channal_Send(1000*lashen[print_flag-4][0],1000*lashen[print_flag-4][1],1000*lashen[print_flag-4][2], 1000*bengjindu[print_flag-4][0]); 
-				}
-
-				count=0;
-			}
-				
-			//GPIOE->ODR^=(1<<13);
-			count++;
-			
+			deg_Node1_Last[i]=deg_Node2[i-4];
+		}
+		else
+		{
+			if( fabs(deg_Node1[i]-deg_Node1_Last[i]) >=deg_kuadu)
+				deg_Node1[i]=deg_Node1_Last[i];	
+		
+			deg_Node1_Last[i]=deg_Node1[i];
+		}
 	}
+	//Zero setting automatically
+	if(zero_flag == 1)
+	{
+		//EPOS_SDOSetTargetCur(8, curr);
+		GPIOE->ODR^=(1<<13);
+		
+		zero_flag = 0;
+		for(i = 0;i < 4;i++)
+		{
+			ang_zero[i] = deg_Node1[i];
+			ang_zero[i+4] = deg_Node2[i];
+		}
+	}
+	
+	for(i = 0;i < 4;i++)
+	{
+		deg_Node1[i] = deg_Node1[i] - ang_zero[i];
+		deg_Node2[i] = deg_Node2[i] - ang_zero[i+4];
+	}
+	
+	
+	//Read actual encoders
+	for(i = 0; i < 3; i++)
+	{
+		for(j = 0; j < 3; j++)
+		{
+			//sec_dst_motor[i][j] = EPOS_SDOReadActualPos(3 * i + j + 1);
+		}
+	}
+	
+	//read real degree by sensor
+	sec_ang_real[0][0] = deg_Node1[0];
+	sec_ang_real[0][1] = deg_Node1[1];
+	sec_ang_real[1][0] = deg_Node1[2];
+	sec_ang_real[1][1] = -deg_Node1[3];
+	sec_ang_real[2][0] = deg_Node2[0];
+	sec_ang_real[2][1] = deg_Node2[1];
+	
+	//set desired trajectory
+	if(start_flag != 0)
+	{
+		if(count_1==speed)
+		{
+			count_1=0;
+			if(start_flag == 1)
+			{
+				for(i = 0; i < 2; i++)
+				{
+					sec_ang_targ[0][i] = sec1_ang[i][kk];
+					//sec_ang_targ[1][i] = sec2_ang[i][kk];
+					sec_ang_targ[2][i] = sec3_ang[i][kk];
+				}
+				sec_ang_targ[1][0] = -sec2_ang[1][kk];
+				sec_ang_targ[1][1] = sec2_ang[0][kk];
+				
+				//GPIOE->ODR^=(1<<13);
+			}
+			else if(start_flag < 8)
+			{
+				i = (7 - start_flag) / 2;
+				j = (7 - start_flag) % 2;
+				sec_ang_targ[i][j] = 20 * sin(kk /441.0 * 2 * PI);
+			}
+
+			kk++;
+			if(kk>=441) kk=0;
+		}
+		count_1++;
+	}
+					
+	//PD Control with degree
+	for(i = 0; i < 3; i++)
+	{
+		for(j = 0; j < 2; j++)
+		{
+			d_ang = P_ang * (sec_ang_targ[i][j] - sec_ang_real[i][j]);
+			if(fabs(d_ang) > 1.0)
+			{
+				d_ang = 1.0 * (d_ang/fabs(d_ang));
+			}
+			sec_ang_step[i][j] = sec_ang_real[i][j] + d_ang;
+		}
+	}
+	
+	//calculate delta motion for next circle
+	for(i = 0; i < 3; i++)
+	{
+		for(j = 0; j < 3; j++)
+		{
+			sec_dst_real[i][j] = q_calc(sec_ang_real[i][0], sec_ang_real[i][1], sec_phi[i], j);
+			sec_dst_step[i][j] = q_calc(sec_ang_step[i][0], sec_ang_step[i][1], sec_phi[i], j);
+			if(i == 0)
+				sec_delta_dst[i][j] = sec_dst_real[i][j] - sec_dst_step[i][j];
+		}
+	}
+	//Add extra motion for behind sections
+	for(j = 0; j < 3; j++)
+	{
+		//#section 2
+		sec_dst_real[1][j] = sec_dst_real[1][j] + q_calc(sec_ang_real[0][0], sec_ang_real[0][1], 0, j);
+		sec_dst_step[1][j] = sec_dst_step[1][j] + q_calc(sec_ang_step[0][0], sec_ang_step[0][1], 0, j);
+		sec_delta_dst[1][j] = sec_dst_real[1][j] - sec_dst_step[1][j];
+		
+		//#section 3
+		sec_dst_real[2][j] = sec_dst_real[2][j] + q_calc(sec_ang_real[0][0], sec_ang_real[0][1], -30, j) + q_calc(sec_ang_real[1][0], sec_ang_real[1][1], -120, j);
+		sec_dst_step[2][j] = sec_dst_step[2][j] + q_calc(sec_ang_step[0][0], sec_ang_step[0][1], -30, j) + q_calc(sec_ang_step[1][0], sec_ang_step[1][1], -120, j);
+		sec_delta_dst[2][j] = sec_dst_real[2][j] - sec_dst_step[2][j];
+	}
+	
+	//Check whether lies in the threshold and The back section is checked behind former.
+	for(i = 0; i < 3; i++)
+	{
+		if((fabs(sec_ang_targ[i][0]-sec_ang_real[i][0])< deg_yuzhi[i][0]) && (fabs(sec_ang_targ[i][1]-sec_ang_real[i][1])< deg_yuzhi[i][1]))
+		{
+			for(j = 0; j < 3; j++)
+			{
+				sec_delta_dst[i][j] = 0;
+			}
+		}
+		else
+		{
+			break;
+		}
+	}
+	
+	//Send command automatic
+	if(send_flag == 1)
+	{
+		for(i = 0; i < 3; i++)
+		{
+			switch_flag = 0;
+			m = puller_idx[i];
+			for(k = m + 1; k < m + 4; k++)
+			{
+				if(k > 2)
+					j = k - 3;
+				else
+					j = k;
+			
+				if((sec_delta_dst[i][j] > 0) && (switch_flag == 0))
+				{		
+					pos_flag[i][j] = 0;
+					if(cur_flag[i][j] == 0)
+					{
+						Switchto_cur(3 * i + j + 1);
+						cur_flag[i][j] = 1;
+					}
+			
+					EPOS_SDOSetTargetCur(3 * i + j + 1, cur_max[i][j]);
+					switch_flag = 1;
+					puller_idx[i] = j;
+				}
+				else
+				{
+					cur_flag[i][j] = 0;
+					if(pos_flag[i][j] == 0)
+					{
+						Switchto_pos(3 * i + j + 1);
+						pos_flag[i][j] = 1;
+					}
+					
+					Motor_StartPos(3 * i + j + 1,sec_delta_dst[i][j]);
+				}
+			}
+		}
+	}
+	//Send command manually
+	if(send_flag == 2)
+	{
+		for(i = 0; i < 3; i++)
+		{
+			for(j = 0; j < 3; j++)
+			{
+				Motor_StartPos(3 * i + j + 1, sec_delta_dst1[i][j]);
+			}
+		}
+	}
+	
+	if(print_flag==1)
+	{
+		VS4Channal_Send(100*sec_ang_real[0][0],100*sec_ang_real[0][1],100*sec_ang_real[1][0], 100*sec_ang_real[1][1]); 
+	}
+	if(print_flag == 2)
+	{
+		VS4Channal_Send(100*sec_ang_real[2][0],100*sec_ang_real[2][1],100*sec_ang_targ[2][0], 100*sec_ang_targ[2][1]);
+	}
+	if(print_flag > 3)
+	{
+		//VS4Channal_Send(1000*lashen[print_flag-4][0],1000*lashen[print_flag-4][1],1000*lashen[print_flag-4][2], 1000*bengjindu[print_flag-4][0]); 
+	}
+
 }
+			
 

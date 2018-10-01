@@ -21,25 +21,26 @@ float deg_Node1_Last[8] = {0}, sec_phi[3] = {30, -90, -30};
 
 //degree threshold and lashen limits
 float deg_yuzhi[3][2] = {0.1, 0.1, 0.1, 0.1, 0.1, 0.1};
-float lashen[3][3] = {0.0};
+float lashen[3][3], bengjindu[3][3] = {0.0};
 
 //P parameters adjustment
-float P_ang=0.10, P_cur = 8000.0;
+float P_ang=0.15, P_bjin = 0.15, P_bjin1 = 0.2;
 
-int32_t qc_actu_q[3][3] = {0};//actual encoders of motors
-float ang_zero[8] = {0}, max_tension = 10, max_loose = -3, deg_kuadu=3, d_l = 24.7;
-uint16_t cur[3][3], cur_max[3][3] = {350, 350, 350, 350, 350, 350, 350, 350, 350}, cur_min[3][3] = {80, 80, 80, 80, 80, 80, 80, 80, 80};
+int32_t qc_actu_q = 0;//actual encoders of motors
+float length_Mid_la=3, length_Min_la=0, length_Max_la=5, deg_kuadu=3, d_l = 24.7;
+float ang_zero[8] = {0}, max_delta_tension = 0, max_delta_loose = 0, bjin_weight = 0;
 
 u8 send_flag=0, print_flag=0;
 
 uint32_t kk=0;
-u8 start_flag=0, count_1=0, speed = 10, zero_flag = 0, double_flag = 0;//¿ØÖÆÃ¿¼¸¸öÖÜÆÚ×ßÒ»¸öµã
-u8 puller_idx[3] = {0}, switch_flag = 0, cur_flag[3][3] = {0}, pos_flag[3][3] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
+u8 start_flag=0, count_1=0, speed = 5, zero_flag = 0;//¿ØÖÆÃ¿¼¸¸öÖÜÆÚ×ßÒ»¸öµã
+u8 loose_idx[2] = {3,3}, Iter_num = 0;
 
 void Algorithm(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 {	
-	u8 i, j, k, m;
 	
+	u8 i, j, k, l_idx;
+				
 	//Initial degree sensor
 	PotPin_Node1_GetValue();	
 	PotPin_Node2_GetValue();	
@@ -110,20 +111,20 @@ void Algorithm(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 			{
 				for(i = 0; i < 2; i++)
 				{
-					sec_ang_targ[0][i] = sec1_ang[i][kk];
+					sec_ang_targ0[0][i] = sec1_ang[i][kk];
 					//sec_ang_targ[1][i] = sec2_ang[i][kk];
-					sec_ang_targ[2][i] = sec3_ang[i][kk];
+					sec_ang_targ0[2][i] = sec3_ang[i][kk];
 				}
-				sec_ang_targ[1][0] = -sec2_ang[1][kk];
-				sec_ang_targ[1][1] = sec2_ang[0][kk];
+				sec_ang_targ0[1][0] = -sec2_ang[1][kk];
+				sec_ang_targ0[1][1] = sec2_ang[0][kk];
 				
-				//GPIOE->ODR^=(1<<13);
+				GPIOE->ODR^=(1<<13);
 			}
 			else if(start_flag < 8)
 			{
 				i = (7 - start_flag) / 2;
 				j = (7 - start_flag) % 2;
-				sec_ang_targ[i][j] = 20 * sin(kk /441.0 * 2 * PI);
+				sec_ang_targ0[i][j] = 20 * sin(kk /441.0 * 2 * PI);
 			}
 
 			kk++;
@@ -131,7 +132,7 @@ void Algorithm(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 		}
 		count_1++;
 	}
-					
+	
 	//PD Control with degree
 	for(i = 0; i < 3; i++)
 	{
@@ -171,9 +172,10 @@ void Algorithm(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 		sec_delta_dst[2][j] = sec_dst_real[2][j] - sec_dst_step[2][j];
 	}
 	
-	//Check whether lies in the threshold and The back section is checked behind former.
+	//degree limit for stability
 	for(i = 0; i < 3; i++)
 	{
+		//Check whether lies in the threshold and The back section is checked behind former.
 		if((fabs(sec_ang_targ[i][0]-sec_ang_real[i][0])< deg_yuzhi[i][0]) && (fabs(sec_ang_targ[i][1]-sec_ang_real[i][1])< deg_yuzhi[i][1]))
 		{
 			for(j = 0; j < 3; j++)
@@ -187,53 +189,104 @@ void Algorithm(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 		}
 	}
 	
-	//Send command automatic
-	if(send_flag == 1)
+	//tension control and limits
+	for(i = 0; i < 3; i++)
 	{
-		for(i = 0; i < 3; i++)
+		//Identify who is loose_idx
+		k = 0;  max_delta_loose = 0; max_delta_tension = 0;
+		for(j = 0; j < 3; j++)
 		{
-			switch_flag = 0;
-			m = puller_idx[i];
-			for(k = m + 1; k < m + 4; k++)
+			qc_actu_q = EPOS_SDOReadActualPos(3 * i + j + 1);
+			sec_dst_motor[i][j] = qc_actu_q*(12.0/4.0/512.0/157.464);
+			lashen[i][j] = sec_dst_motor[i][j] - ((i+1) * d_l - sec_dst_real[i][j]);
+			if(sec_delta_dst[i][j] < max_delta_loose)
 			{
-				if(k > 2)
-					j = k - 3;
-				else
-					j = k;
+				max_delta_loose = sec_delta_dst[i][j];
+			}
+			else if(sec_delta_dst[i][j] > max_delta_tension)
+			{
+				max_delta_tension = sec_delta_dst[i][j];
+			}
 			
-				if((sec_delta_dst[i][j] > 0) && (switch_flag == 0))
-				{		
-					pos_flag[i][j] = 0;
-					if(cur_flag[i][j] == 0)
-					{
-						Switchto_cur(3 * i + j + 1);
-						cur_flag[i][j] = 1;
-					}
-			
-					EPOS_SDOSetTargetCur(3 * i + j + 1, cur_max[i][j]);
-					switch_flag = 1;
-					puller_idx[i] = j;
-				}
-				else
+			if(sec_delta_dst[i][j] < 0)
+			{
+				//Identify whether the cable is opposite and reset bengjindu
+				if(sec_delta_last[i][j] > 0)
 				{
-					cur_flag[i][j] = 0;
-					if(pos_flag[i][j] == 0)
+					sec_delta_last[i][j] = 0;
+					bengjindu[i][j] = -0.5;    //set desired tension value
+				}
+				//Control tensions for each cable
+				sec_delta_dst[i][j] = sec_delta_dst[i][j] - P_bjin * (lashen[i][j] - bengjindu[i][j]);
+				loose_idx[k] = j; 
+				k++;
+			}
+			else if(sec_delta_dst[i][j] > 0)
+			{
+				//Record the last driven value
+				sec_delta_last[i][j] = sec_delta_dst[i][j];
+			}
+		}
+		for(j = 0; j < 3; j++)
+		{
+			if(sec_delta_dst[i][j] > 0)
+			{
+				//Max limits for stretching
+				if(lashen[i][j] > length_Mid_la)
+				{
+					if(lashen[i][j] > length_Max_la)
 					{
-						Switchto_pos(3 * i + j + 1);
-						pos_flag[i][j] = 1;
+						sec_delta_dst[i][j] = 0;
 					}
 					
-					Motor_StartPos(3 * i + j + 1,sec_delta_dst[i][j]);
+					for(l_idx = 0; l_idx < k; l_idx++)
+					{
+						if(max_delta_loose != 0 && max_delta_tension != 0)
+						{
+							bjin_weight = (sec_delta_dst[i][loose_idx[l_idx]] / max_delta_loose)*(sec_delta_dst[i][j] / max_delta_tension);
+							bengjindu[i][loose_idx[l_idx]] = bengjindu[i][loose_idx[l_idx]] - P_bjin1 * (lashen[i][j] - length_Mid_la) * bjin_weight;
+							if(bengjindu[i][loose_idx[l_idx]] < -1.5)
+							{
+								bengjindu[i][loose_idx[l_idx]] = -1.5;
+							}
+						}
+					}
 				}
+				else if(lashen[i][j] < length_Min_la)
+				{
+					for(l_idx = 0; l_idx < k; l_idx++)
+					{
+						if(max_delta_loose != 0 && max_delta_tension != 0)
+						{
+							bjin_weight = (sec_delta_dst[i][loose_idx[l_idx]] / max_delta_loose)*(sec_delta_dst[i][j] / max_delta_tension);
+							bengjindu[i][loose_idx[l_idx]] = bengjindu[i][loose_idx[l_idx]] - P_bjin1 * (lashen[i][j] - length_Min_la) * bjin_weight;
+							if(bengjindu[i][loose_idx[l_idx]] > 1)
+							{
+								bengjindu[i][loose_idx[l_idx]] = 1.0;
+							}
+						}
+					}
+					
+					sec_delta_dst[i][j] = sec_delta_dst[i][j] - P_bjin1 * (lashen[i][j] - length_Min_la);
+				}
+				
 			}
 		}
 	}
-	//Send command manually
-	if(send_flag == 2)
+	
+	//Send motor servo command
+	for(i = 0; i < 3; i++)
 	{
-		for(i = 0; i < 3; i++)
+		for(j = 0; j < 3; j++)
 		{
-			for(j = 0; j < 3; j++)
+			//Send command automatic
+			if(send_flag == 1)
+			{
+				Motor_StartPos(3 * i + j + 1, sec_delta_dst[i][j]);
+				//GPIOE->ODR^=(1<<13);
+			}
+			//Send command manually
+			if(send_flag == 2)
 			{
 				Motor_StartPos(3 * i + j + 1, sec_delta_dst1[i][j]);
 			}
@@ -250,9 +303,7 @@ void Algorithm(void)//´Ë´¦Èç¸ü¸ÄTIMforTASKÐèÊÖ¶¯¸ü¸Ä
 	}
 	if(print_flag > 3)
 	{
-		//VS4Channal_Send(1000*lashen[print_flag-4][0],1000*lashen[print_flag-4][1],1000*lashen[print_flag-4][2], 1000*bengjindu[print_flag-4][0]); 
+		VS4Channal_Send(1000*lashen[print_flag-4][0],1000*lashen[print_flag-4][1],1000*lashen[print_flag-4][2], 1000*bengjindu[print_flag-4][0]); 
 	}
 
 }
-			
-
